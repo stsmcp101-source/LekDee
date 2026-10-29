@@ -1,4 +1,4 @@
-# วิเคราะห์เลขกำลังวัน (Mobile-first PWA)
+# LekDee (Mobile-first PWA)
 
 Vite + Tailwind + Supabase (ไม่บังคับ) · deploy บน Vercel
 

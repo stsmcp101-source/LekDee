@@ -1,6 +1,6 @@
 {
-  "name": "วิเคราะห์เลขกำลังวัน",
-  "short_name": "เลขกำลังวัน",
+  "name": "LekDee",
+  "short_name": "LekDee",
   "description": "ตารางเลขกำลังวัน + จันทรคติไทย",
   "start_url": "/",
   "display": "standalone",

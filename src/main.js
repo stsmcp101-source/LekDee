@@ -255,7 +255,7 @@ function renderDashboard() {
 function summaryText() {
   const r = state.result;
   const lines = [
-    `[สรุปเลขกำลังวัน]`,
+    `[สรุป LekDee]`,
     `งวด: ${formatThaiDate(state.date)}`,
     `จันทรคติ: ${state.phase === 'waxing' ? 'ข้างขึ้น' : 'ข้างแรม'} ${state.kham} ค่ำ`,
     `เลขเด่น 3 อันดับ: ${r.sortedDigits.slice(0, 3).join(', ')}`,
