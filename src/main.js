@@ -2,6 +2,8 @@ import './style.css';
 import { THAI_DAYS, TABLES_DATA, HISTORICAL_DRAWS, QUICK_DRAWS } from './data.js';
 import { calculateThaiLunar, formatThaiDate, moonIcon, parseISO, shortThaiDate, toISO } from './lunar.js';
 import { runEngine, runBacktest, tuneTrainTest, PAIR_COUNT_OPTIONS, DEFAULT_PAIR_COUNT } from './engine.js';
+import { LAO_DRAWS } from './lao-data.js';
+import { runLaoEngine, runLaoBacktest, nextDrawDate, laoPairBaseline } from './lao.js';
 import * as store from './store.js';
 
 /* ------------------------------------------------------------------ state */
@@ -39,6 +41,7 @@ const pct = (n, d = 1) => `${(n * 100).toFixed(d)}%`;
 const TABS = [
   { id: 'dashboard', label: 'วิเคราะห์', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   { id: 'backtest', label: 'ย้อนหลัง', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+  { id: 'lao', label: 'หวยลาว', icon: 'M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9' },
   { id: 'reference', label: 'ตาราง', icon: 'M3 10h18M3 14h18M10 3v18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z' },
   { id: 'history', label: 'ประวัติ', icon: 'M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z' },
 ];
@@ -100,6 +103,7 @@ function switchTab(id) {
   renderNav();
   if (id === 'backtest') renderBacktest();
   if (id === 'history') loadHistory();
+  if (id === 'lao') renderLao();
   window.scrollTo({ top: 0 });
 }
 
@@ -447,6 +451,113 @@ async function submitDraw(form) {
   }
 }
 
+/* ------------------------------------------------------------------ lao pattana */
+function renderLao() {
+  const next = nextDrawDate();
+  const r = runLaoEngine(LAO_DRAWS, next.getDay(), { pairCount: state.pairCount });
+  const bt = runLaoBacktest(LAO_DRAWS, { pairCount: state.pairCount });
+  const hitMap = new Map(bt.rows.map((x) => [x.draw.date, x]));
+  const first = LAO_DRAWS[0].date;
+  const last = LAO_DRAWS[LAO_DRAWS.length - 1];
+  const high = r.sortedDigits.slice(0, 3);
+  const kpi = (title, val, sub, base) => `
+    <div class="bg-surface-card border border-surface-border rounded-2xl p-3.5 shadow-card">
+      <span class="text-[11px] text-brand-slate block">${title}</span>
+      <span class="text-2xl font-black font-mono text-brand-emerald">${val}</span>
+      <span class="text-[11px] text-slate-500 block">${sub}</span>
+      <span class="text-[10px] text-slate-400 block">สุ่มล้วนคาดว่า ≈ ${base}</span>
+    </div>`;
+
+  $('view-lao').innerHTML = `
+    <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-3">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <h2 class="text-sm font-bold flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-500"></span>หวยลาวพัฒนา</h2>
+          <p class="text-[11px] text-brand-slate">ออกรางวัลจันทร์–ศุกร์ เวลา 20.00 น. · เลขรางวัล 6 ตัว ใช้ 2–3 ตัวท้ายตรวจ</p>
+        </div>
+        <div class="text-right shrink-0">
+          <span class="text-[10px] text-slate-400 block">งวดถัดไป</span>
+          <span class="text-xs font-bold text-brand-emerald">${formatThaiDate(next)}</span>
+        </div>
+      </div>
+      <div class="p-3 rounded-xl bg-surface-muted/60 border border-surface-border flex items-center justify-between gap-3">
+        <div><span class="text-[11px] text-brand-slate block">ผลล่าสุด · ${shortThaiDate(last.date)}</span>
+          <span class="font-mono text-xl font-black tracking-widest">${last.n6.slice(0, 3)}<span class="text-brand-emerald">${last.n6.slice(3)}</span></span></div>
+        <div class="text-right text-[11px] text-slate-500">3 ตัวท้าย <b class="font-mono text-brand-navy">${last.last3}</b><br>2 ตัวท้าย <b class="font-mono text-brand-emerald">${last.last2}</b></div>
+      </div>
+      <p class="text-[11px] text-slate-500">วิเคราะห์จากสถิติเลข ${LAO_DRAWS.length} งวดล่าสุด (${shortThaiDate(first)}–${shortThaiDate(last.date)}) ร่วมกับตารางกำลังวันเล็กน้อย</p>
+    </section>
+
+    <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-3">
+      <h3 class="text-sm font-bold">คะแนนเลขเดี่ยว 0–9</h3>
+      <div class="grid grid-cols-5 xl:grid-cols-10 gap-2">
+        ${r.sortedDigits.slice().sort((a, b) => a - b).map((d) => {
+          const isTop = high.includes(d);
+          return `<div class="p-2 rounded-xl border text-center ${isTop ? 'border-amber-300 bg-amber-50/40 ring-1 ring-amber-200' : 'border-surface-border'}">
+            <span class="text-lg font-black font-mono ${isTop ? 'text-brand-goldDark' : ''}">${d}</span>
+            <span class="block text-[10px] font-mono text-slate-500">${r.probMap[d].toFixed(1)}%</span></div>`;
+        }).join('')}
+      </div>
+      <p class="text-xs">เด่น 3 อันดับ: ${high.map((d, i) => `<b class="font-mono text-base ${i === 0 ? 'text-brand-goldDark' : 'text-brand-emerald'}">${d}</b>`).join(' · ')}</p>
+    </section>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <section class="lg:col-span-7 bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-3">
+        <div class="flex items-start justify-between gap-2 pb-3 border-b border-surface-border">
+          <div>
+            <h4 class="text-sm font-bold"><span class="text-brand-gold">✦</span> ชุดเด่น 2 ตัว (${r.corePairs.length} คู่)</h4>
+            <p class="text-[11px] text-brand-slate">รวมเลขกลับ · ชุดกันอีก ${r.protectionPairs.length} คู่</p>
+          </div>
+          <button data-copy="lao-core" class="shrink-0 px-2.5 py-1 text-xs font-semibold rounded-lg bg-surface-muted border border-surface-border">คัดลอก</button>
+        </div>
+        ${pairCountPicker()}
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          ${r.corePairs.map((p, i) => `<div class="p-2.5 rounded-xl bg-amber-50/50 border border-amber-200"><div class="flex items-center justify-between"><span class="text-xl font-black font-mono text-brand-goldDark tracking-wider">${p.pair}</span><span class="text-[10px] px-1.5 rounded bg-amber-100 text-brand-goldDark border border-amber-300 font-bold">#${i + 1}</span></div><div class="text-[10px] text-slate-500 mt-1">กลับ <b class="font-mono">${p.reversed}</b></div></div>`).join('')}
+        </div>
+        <div class="pt-3 border-t border-surface-border">
+          <span class="text-xs font-bold text-brand-slate">🛡️ ชุดกัน</span>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">${r.protectionPairs.map((p) => `<div class="p-2 rounded-lg bg-surface-muted/60 border border-surface-border"><span class="text-base font-bold font-mono">${p.pair}</span><span class="block text-[10px] text-slate-400">กลับ ${p.reversed}</span></div>`).join('')}</div>
+        </div>
+      </section>
+      <section class="lg:col-span-5 bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-3">
+        <div class="flex items-start justify-between gap-2 pb-3 border-b border-surface-border">
+          <div><h4 class="text-sm font-bold"><span class="text-brand-emerald">✦</span> ชุด 3 ตัว (${r.trioSets.length} ชุด)</h4><p class="text-[11px] text-brand-slate">ซื้อโต๊ด 6 ประตู</p></div>
+          <button data-copy="lao-trio" class="shrink-0 px-2.5 py-1 text-xs font-semibold rounded-lg bg-surface-muted border border-surface-border">คัดลอก</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
+          ${r.trioSets.map((t, i) => `<div class="p-2.5 rounded-xl border border-surface-border flex items-center gap-3"><div class="w-8 h-8 rounded-lg bg-emerald-50 text-brand-emerald font-mono font-bold flex items-center justify-center text-xs border border-emerald-200">0${i + 1}</div><span class="text-xl font-black font-mono tracking-wider">${t.code}</span></div>`).join('')}
+        </div>
+      </section>
+    </div>
+
+    <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-3">
+      <div>
+        <h3 class="text-sm font-bold">ผลทดสอบย้อนหลัง (${bt.total} งวด)</h3>
+        <p class="text-[11px] text-slate-500">ทำนายทีละงวดโดยใช้เฉพาะผลที่ออกก่อนหน้า (ไม่แอบดูอนาคต) · 30 งวดแรกใช้เป็นข้อมูลตั้งต้น · หวยลาวมีเลข 2 ตัวท้ายชุดเดียว ไม่มี 2 ตัวล่างแยก</p>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        ${kpi('เข้าชุดเด่น 2 ตัว', pct(bt.coreHits / bt.total, 0), `${bt.coreHits}/${bt.total} งวด · ${bt.avgCore.toFixed(0)} คู่`, pct(bt.coreBaseline, 0))}
+        ${kpi('เข้าชุดเด่น+กัน', pct(bt.anyHits / bt.total, 0), `${bt.anyHits}/${bt.total} งวด · ${bt.avgAll.toFixed(0)} คู่`, pct(bt.anyBaseline, 0))}
+        ${kpi('ชุด 3 ตัว', pct(bt.trioHits / bt.total, 1), `${bt.trioHits}/${bt.total} งวด · ${bt.avgTrio.toFixed(0)} ชุด`, pct(bt.trioBaseline, 1))}
+      </div>
+      <p class="text-xs p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-brand-goldDark">ถ้าผลใกล้เคียงหรือต่ำกว่า “สุ่มล้วน” แปลว่าสถิติย้อนหลังไม่ช่วยให้เดาแม่นขึ้น หวยลาวเป็นการสุ่มโดยแท้</p>
+    </section>
+
+    <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-2">
+      <h3 class="text-sm font-bold">ผลรางวัลย้อนหลัง ${LAO_DRAWS.length} งวด</h3>
+      <div class="divide-y divide-surface-border max-h-[28rem] overflow-y-auto pr-1">
+        ${[...LAO_DRAWS].reverse().map((d) => {
+          const h = hitMap.get(d.date);
+          return `<div class="py-2 flex items-center justify-between gap-2 text-sm">
+            <div><b>${shortThaiDate(d.date)}</b> <span class="text-[11px] text-slate-400">${THAI_DAYS[new Date(d.date + 'T12:00:00').getDay()]}</span></div>
+            <div class="font-mono">${d.n6.slice(0, 3)}<b class="text-brand-emerald">${d.n6.slice(3)}</b></div>
+            <span class="w-14 text-center text-[10px] px-1.5 py-0.5 rounded-full border ${h ? (h.anyHit ? 'bg-emerald-50 text-brand-emerald border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200') : 'text-slate-300 border-transparent'}">${h ? (h.anyHit ? 'เข้า ✓' : 'หลุด') : 'ตั้งต้น'}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </section>`;
+}
+
 /* ------------------------------------------------------------------ reference */
 function renderReference() {
   const data = TABLES_DATA[state.refSub];
@@ -517,6 +628,12 @@ document.addEventListener('click', async (e) => {
     state.manual = true;
     return compute();
   }
+  if (d.copy === 'lao-core' || d.copy === 'lao-trio') {
+    const lr = runLaoEngine(LAO_DRAWS, nextDrawDate().getDay(), { pairCount: state.pairCount });
+    const list = d.copy === 'lao-core' ? lr.corePairs.map((p) => p.pair) : lr.trioSets.map((x) => x.code);
+    await copyText(list.join(', '));
+    return toast('คัดลอกแล้ว: ' + list.join(', '));
+  }
   if (d.copy) {
     const r = state.result;
     const map = {
@@ -537,6 +654,7 @@ document.addEventListener('click', async (e) => {
     }
     compute();
     if (state.tab === 'backtest') renderBacktest();
+    if (state.tab === 'lao') renderLao();
     return;
   }
   if (d.filter) {

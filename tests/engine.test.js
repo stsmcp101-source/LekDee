@@ -47,3 +47,23 @@ test('train/test tuning is deterministic and never worse on train', async () => 
   assert.ok(a.tunedTrain >= a.defaultTrain);
   assert.equal(a.trainSize + a.testSize, 120);
 });
+
+test('lao data: 120 unique weekday draws with 6-digit numbers', async () => {
+  const { LAO_DRAWS } = await import('../src/lao-data.js');
+  assert.equal(LAO_DRAWS.length, 120);
+  assert.equal(new Set(LAO_DRAWS.map((d) => d.date)).size, 120);
+  for (const d of LAO_DRAWS) {
+    assert.match(d.n6, /^\d{6}$/);
+    const dow = new Date(d.date + 'T12:00:00Z').getUTCDay();
+    assert.ok(dow >= 1 && dow <= 5, d.date);
+  }
+});
+
+test('lao walk-forward backtest never uses the draw being predicted', async () => {
+  const { LAO_DRAWS } = await import('../src/lao-data.js');
+  const { runLaoBacktest, runLaoEngine } = await import('../src/lao.js');
+  const bt = runLaoBacktest(LAO_DRAWS);
+  assert.equal(bt.total, 90);
+  assert.ok(bt.coreHits <= bt.anyHits);
+  assert.equal(runLaoEngine(LAO_DRAWS, 3, { pairCount: 12 }).corePairs.length, 12);
+});
