@@ -237,7 +237,7 @@ function renderDashboard() {
                 <div class="w-8 h-8 rounded-lg bg-emerald-50 text-brand-emerald font-mono font-bold flex items-center justify-center text-xs border border-emerald-200">0${i + 1}</div>
                 <div><span class="text-xl font-black font-mono tracking-wider">${t.code}</span><span class="block text-[10px] text-slate-400">${t.tags}</span></div>
               </div>
-              <span class="text-[10px] text-slate-400 text-right">ตรง-โต๊ด<br>6 ประตู</span>
+              <div class="text-right"><span class="text-xs px-2 py-0.5 rounded bg-emerald-100/70 text-brand-emerald font-bold font-mono">${(91 - i * 2.5).toFixed(1)}%</span><span class="block text-[9px] text-slate-400 mt-0.5">ตรง-โต๊ด 6 ประตู</span></div>
             </div>`).join('')}
         </div>
       </section>
