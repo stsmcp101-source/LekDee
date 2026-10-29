@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#059669">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="เลขกำลังวัน">
+  <title>วิเคราะห์เลขกำลังวัน</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-surface-base text-brand-navy min-h-screen font-sans antialiased">
+
+  <header class="sticky top-0 z-40 bg-surface-card/95 backdrop-blur-md border-b border-surface-border pt-[env(safe-area-inset-top)]">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+      <div class="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-tr from-brand-emerald to-emerald-400 flex items-center justify-center text-white shadow-emeraldGlow">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      </div>
+      <div class="min-w-0 flex-1">
+        <h1 class="text-base sm:text-lg font-bold leading-tight truncate">วิเคราะห์เลขกำลังวัน</h1>
+        <p class="text-[11px] text-brand-slate truncate">ตารางกำลังวัน + จันทรคติไทย</p>
+      </div>
+      <span id="storageBadge" class="text-[10px] px-2 py-0.5 rounded-full border border-surface-border bg-surface-muted text-brand-slate whitespace-nowrap"></span>
+      <nav class="hidden md:flex items-center gap-1 bg-surface-muted p-1 rounded-xl border border-surface-border" id="topNav"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto w-full px-4 pt-4 pb-28 md:pb-10 space-y-5">
+    <div id="view-dashboard" class="space-y-5"></div>
+    <div id="view-backtest" class="hidden space-y-5"></div>
+    <div id="view-reference" class="hidden space-y-5"></div>
+    <div id="view-history" class="hidden space-y-5"></div>
+
+    <p class="text-[11px] leading-relaxed text-slate-500 text-center px-2">
+      ⚠️ แอปนี้เป็นเครื่องมือคำนวณตามสูตร/ความเชื่อเพื่อความบันเทิงเท่านั้น ผลสลากเป็นการสุ่ม ไม่มีสูตรใดรับประกันผลได้
+      โปรดใช้วิจารณญาณและไม่เสี่ยงเกินกำลัง
+    </p>
+  </main>
+
+  <nav id="bottomNav" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface-card/95 backdrop-blur-md border-t border-surface-border pb-[env(safe-area-inset-bottom)]"></nav>
+
+  <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-6 z-50 translate-y-6 opacity-0 transition-all duration-300 pointer-events-none max-w-[90vw] bg-surface-card border border-brand-emerald px-4 py-2.5 rounded-xl shadow-elevated text-sm flex items-center gap-2">
+    <span class="w-5 h-5 shrink-0 rounded-full bg-emerald-100 text-brand-emerald flex items-center justify-center font-bold text-xs">✓</span>
+    <span id="toastMsg" class="font-medium"></span>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
