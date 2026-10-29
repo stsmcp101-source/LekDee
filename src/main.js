@@ -1,7 +1,7 @@
 import './style.css';
 import { THAI_DAYS, TABLES_DATA, HISTORICAL_DRAWS, QUICK_DRAWS } from './data.js';
 import { calculateThaiLunar, formatThaiDate, moonIcon, parseISO, shortThaiDate, toISO } from './lunar.js';
-import { runEngine, runBacktest } from './engine.js';
+import { runEngine, runBacktest, tuneTrainTest, PAIR_COUNT_OPTIONS, DEFAULT_PAIR_COUNT } from './engine.js';
 import * as store from './store.js';
 
 /* ------------------------------------------------------------------ state */
@@ -15,10 +15,22 @@ const state = {
   showPool: false,
   refSub: 'day',
   btFilter: 'all',
+  pairCount: readPairCount(),
+  tune: null,
+  tuning: false,
   result: null,
   userDraws: [],
   history: [],
 };
+
+function readPairCount() {
+  try {
+    const n = Number(localStorage.getItem('pairCount'));
+    return PAIR_COUNT_OPTIONS.includes(n) ? n : DEFAULT_PAIR_COUNT;
+  } catch {
+    return DEFAULT_PAIR_COUNT;
+  }
+}
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -108,7 +120,7 @@ function applyDate(date, forced) {
 }
 
 function compute() {
-  state.result = runEngine(state.date.getDay(), state.phase);
+  state.result = runEngine(state.date.getDay(), state.phase, { pairCount: state.pairCount });
   renderDashboard();
 }
 
@@ -177,7 +189,7 @@ function renderDashboard() {
     <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card">
       <h3 class="text-sm font-bold mb-0.5 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-brand-emerald"></span>คะแนนเลขเดี่ยว 0–9</h3>
       <p class="text-[11px] text-brand-slate mb-3">สัดส่วนคะแนนสัมพัทธ์จากตารางวัน + จันทรคติ + เลขกึ่งกลาง + ความถี่ 5 ปี (รวม = 100%)</p>
-      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">${Array.from({ length: 10 }, (_, d) => digitCard(d, r)).join('')}</div>
+      <div class="grid grid-cols-2 sm:grid-cols-5 xl:grid-cols-10 gap-2">${Array.from({ length: 10 }, (_, d) => digitCard(d, r)).join('')}</div>
       <div class="mt-3 p-3 rounded-xl bg-surface-muted/60 border border-surface-border flex items-center justify-between gap-3">
         <div>
           <span class="text-[11px] font-bold text-brand-slate block">★ เลขเด่นวิ่ง / รูด</span>
@@ -196,6 +208,7 @@ function renderDashboard() {
           </div>
           <button data-copy="corePairs" class="shrink-0 px-2.5 py-1 text-xs font-semibold rounded-lg bg-surface-muted border border-surface-border">คัดลอก</button>
         </div>
+        ${pairCountPicker()}
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           ${r.corePairs.map((p, i) => `
             <div class="p-2.5 rounded-xl bg-amber-50/50 border border-amber-200">
@@ -299,9 +312,45 @@ async function saveCurrent() {
 }
 
 /* ------------------------------------------------------------------ backtest */
+function pairCountPicker() {
+  return `
+    <div class="flex items-center justify-between gap-2 text-xs">
+      <span class="text-slate-500">จำนวนชุดเด่น</span>
+      <div class="flex gap-1 bg-surface-muted p-1 rounded-lg border border-surface-border">
+        ${PAIR_COUNT_OPTIONS.map((n) => `<button data-paircount="${n}" class="px-3 py-1 rounded-md ${state.pairCount === n ? 'bg-surface-card text-brand-emerald font-semibold shadow-sm' : 'text-brand-slate'}">${n} คู่</button>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderTune() {
+  const t = state.tune;
+  if (state.tuning) return '<p class="text-xs text-slate-400">กำลังทดลองปรับสูตร 300 รอบ…</p>';
+  if (!t) return `<button data-act="tune" class="w-full py-2.5 rounded-xl bg-brand-emerald text-white text-sm font-semibold">▶ รันการทดลอง (${state.pairCount} คู่)</button>`;
+  const cell = (v, strong) => `<td class="p-2 text-center font-mono ${strong ? 'font-bold text-brand-navy' : 'text-slate-600'}">${pct(v)}</td>`;
+  const gain = t.tunedTest - t.defaultTest;
+  const verdict =
+    t.tunedTest <= t.defaultTest
+      ? 'สูตรที่ปรับแล้วเข้าเป้างวดเก่าได้มากขึ้น แต่กับงวดใหม่ที่ไม่เคยเห็นกลับได้ผลเท่าเดิมหรือแย่ลง แปลว่าสูตรแค่จำผลเก่า (overfitting) ไม่ได้ทำนายได้ดีขึ้น'
+      : `สูตรที่ปรับแล้วดีขึ้นกับงวดใหม่ ${pct(gain)} แต่ชุดทดสอบมีแค่ ${t.testSize} งวด ความคลาดเคลื่อนจากการสุ่มอยู่ราว ±${pct(Math.sqrt(t.baseline * (1 - t.baseline) / t.testSize) * 2, 0)} จึงยังสรุปไม่ได้ว่าดีขึ้นจริง`;
+  return `
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs min-w-[300px]">
+        <thead><tr class="bg-surface-muted text-brand-slate"><th class="p-2 text-left">สูตร</th><th class="p-2">งวดเก่า (ใช้ปรับ)<br><span class="font-normal">${t.trainSize} งวด</span></th><th class="p-2">งวดใหม่ (ทดสอบ)<br><span class="font-normal">${t.testSize} งวด</span></th></tr></thead>
+        <tbody class="divide-y divide-surface-border">
+          <tr><td class="p-2">สูตรเดิม</td>${cell(t.defaultTrain)}${cell(t.defaultTest, true)}</tr>
+          <tr><td class="p-2">สูตรที่ปรับแล้ว</td>${cell(t.tunedTrain)}${cell(t.tunedTest, true)}</tr>
+          <tr><td class="p-2 text-slate-400">สุ่มล้วน (${t.pairCount} คู่)</td>${cell(t.baseline)}${cell(t.baseline)}</tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-[11px] text-slate-500">งวดเก่า ${shortThaiDate(t.trainRange[0])}–${shortThaiDate(t.trainRange[1])} · งวดใหม่ ${shortThaiDate(t.testRange[0])}–${shortThaiDate(t.testRange[1])}</p>
+    <p class="text-xs p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-brand-goldDark">${verdict}</p>
+    <button data-act="tune" class="text-[11px] text-brand-emerald font-medium">รันใหม่ (${state.pairCount} คู่)</button>`;
+}
+
 function renderBacktest() {
   const draws = allDraws();
-  const bt = runBacktest(draws);
+  const bt = runBacktest(draws, { pairCount: state.pairCount });
   const kpi = (title, val, sub, base) => `
     <div class="bg-surface-card border border-surface-border rounded-2xl p-3.5 shadow-card">
       <span class="text-[11px] text-brand-slate block">${title}</span>
@@ -312,12 +361,22 @@ function renderBacktest() {
   const rows = bt.rows.filter((r) => state.btFilter === 'all' || r.anyHit);
 
   $('view-backtest').innerHTML = `
-    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
-      ${kpi('เข้าชุดเด่น (Core)', pct(bt.coreHits / bt.total, 0), `${bt.coreHits}/${bt.total} งวด · เฉลี่ย ${bt.avgCore.toFixed(1)} คู่`, pct(bt.coreBaseline, 0))}
-      ${kpi('เข้าชุดเด่น+กัน', pct(bt.anyHits / bt.total, 0), `${bt.anyHits}/${bt.total} งวด · เฉลี่ย ${bt.avgAll.toFixed(1)} คู่`, pct(bt.anyBaseline, 0))}
+    <section class="bg-surface-card border border-surface-border rounded-2xl p-3 shadow-card">${pairCountPicker()}</section>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      ${kpi('เข้าชุดเด่น (Core)', pct(bt.coreHits / bt.total, 0), `${bt.coreHits}/${bt.total} งวด · ${bt.avgCore.toFixed(0)} คู่`, pct(bt.coreBaseline, 0))}
+      ${kpi('เข้าชุดเด่น+กัน', pct(bt.anyHits / bt.total, 0), `${bt.anyHits}/${bt.total} งวด · ${bt.avgAll.toFixed(0)} คู่`, pct(bt.anyBaseline, 0))}
+      ${kpi('ชุด 3 ตัว (ตรง-โต๊ด)', pct(bt.trioHits / bt.total, 1), `${bt.trioHits}/${bt.total} งวด · ${bt.avgTrio.toFixed(0)} ชุด`, pct(bt.trioBaseline, 1))}
       ${kpi('เลขวิ่ง 3 อันดับ', pct(bt.runHits / bt.total, 0), `${bt.runHits}/${bt.total} งวด`, pct(bt.runBaseline, 0))}
     </div>
-    <p class="text-[11px] text-slate-500 px-1">คำนวณสดจากข้อมูลงวดด้านล่าง (บน/ล่างอย่างใดอย่างหนึ่ง, นับเลขกลับ) พร้อมค่าเปรียบเทียบเมื่อสุ่มล้วน — ถ้าผลใกล้เคียงกัน แปลว่าสูตรไม่ได้ให้ความได้เปรียบเหนือการสุ่ม</p>
+    <p class="text-[11px] text-slate-500 px-1">คำนวณสดจากข้อมูลงวดด้านล่าง: 2 ตัวนับบนหรือล่าง รวมเลขกลับ · 3 ตัวเทียบกับ 3 ตัวท้ายรางวัลที่ 1 แบบซื้อครบ 6 ประตู · ค่า "สุ่มล้วน" คือผลที่ได้ถ้าเลือกเลขมั่ว ๆ จำนวนเท่ากัน — การเพิ่มจำนวนคู่ทำให้เข้าบ่อยขึ้นเพราะซื้อมากขึ้น ไม่ใช่เพราะสูตรแม่นขึ้น</p>
+
+    <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-3">
+      <div>
+        <h3 class="text-sm font-bold">🧪 ทดลองปรับสูตร (แยกข้อมูลทดสอบ)</h3>
+        <p class="text-[11px] text-slate-500">สุ่มปรับน้ำหนักสูตร 300 แบบ เลือกแบบที่เข้าชุดเด่นมากที่สุดในงวดเก่า แล้วนำไปทดสอบกับ 40 งวดล่าสุดที่สูตรไม่เคยเห็น</p>
+      </div>
+      ${renderTune()}
+    </section>
 
     <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-3">
       <h3 class="text-sm font-bold">เพิ่มผลรางวัลจริง</h3>
@@ -468,6 +527,18 @@ document.addEventListener('click', async (e) => {
     await copyText(map[d.copy].join(', '));
     return toast('คัดลอกแล้ว: ' + map[d.copy].join(', '));
   }
+  if (d.paircount) {
+    state.pairCount = Number(d.paircount);
+    state.tune = null;
+    try {
+      localStorage.setItem('pairCount', d.paircount);
+    } catch {
+      /* storage blocked */
+    }
+    compute();
+    if (state.tab === 'backtest') renderBacktest();
+    return;
+  }
   if (d.filter) {
     state.btFilter = d.filter;
     return renderBacktest();
@@ -497,6 +568,15 @@ document.addEventListener('click', async (e) => {
     case 'toggleManual': state.showManual = !state.showManual; return renderDashboard();
     case 'togglePool': state.showPool = !state.showPool; return renderDashboard();
     case 'save': return saveCurrent();
+    case 'tune':
+      state.tuning = true;
+      renderBacktest();
+      setTimeout(() => {
+        state.tune = tuneTrainTest(allDraws(), { pairCount: state.pairCount });
+        state.tuning = false;
+        renderBacktest();
+      }, 30);
+      return;
     case 'copyAll': await copyText(summaryText()); return toast('คัดลอกสรุปแล้ว');
     case 'download': return download();
   }

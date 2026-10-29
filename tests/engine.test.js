@@ -31,3 +31,19 @@ test('backtest counts are consistent', () => {
   assert.equal(bt.total, 120);
   assert.ok(bt.coreHits <= bt.anyHits && bt.anyHits <= bt.total);
 });
+
+test('pair count option controls core size', () => {
+  for (const pairCount of [8, 12, 17]) {
+    const r = runEngine(5, 'waning', { pairCount });
+    assert.equal(r.corePairs.length, Math.min(pairCount, r.allPairs.length));
+  }
+});
+
+test('train/test tuning is deterministic and never worse on train', async () => {
+  const { tuneTrainTest } = await import('../src/engine.js');
+  const a = tuneTrainTest(HISTORICAL_DRAWS, { iters: 30 });
+  const b = tuneTrainTest(HISTORICAL_DRAWS, { iters: 30 });
+  assert.equal(a.tunedTest, b.tunedTest);
+  assert.ok(a.tunedTrain >= a.defaultTrain);
+  assert.equal(a.trainSize + a.testSize, 120);
+});

@@ -7,5 +7,19 @@ body { overscroll-behavior-y: none; }
 button { touch-action: manipulation; }
 input, select { font-size: 16px; } /* กัน iOS ซูมเองตอนโฟกัส */
 
+/* iOS/Android ให้ช่องวันที่มีความกว้างขั้นต่ำของตัวเอง ทำให้ล้นขอบการ์ด */
+input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+}
+input[type='date']::-webkit-date-and-time-value { text-align: left; margin: 0; }
+input[type='date']::-webkit-calendar-picker-indicator { opacity: 0.6; }
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
