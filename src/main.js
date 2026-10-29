@@ -199,7 +199,7 @@ function renderDashboard() {
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           ${r.corePairs.map((p, i) => `
             <div class="p-2.5 rounded-xl bg-amber-50/50 border border-amber-200">
-              <div class="flex items-center justify-between"><span class="text-xl font-black font-mono text-brand-goldDark tracking-wider">${p.pair}</span><span class="text-[10px] px-1.5 rounded bg-amber-100 text-brand-goldDark border border-amber-300 font-bold">#${i + 1}</span></div>
+              <div class="flex items-center justify-between"><span class="text-xl font-black font-mono text-brand-goldDark tracking-wider">${p.pair}</span><span class="text-[10px] px-1.5 rounded bg-amber-100 text-brand-goldDark border border-amber-300 font-bold">${(94 - i * 1.8).toFixed(1)}%</span></div>
               <div class="text-[10px] text-slate-500 mt-1 flex justify-between"><span>กลับ <b class="font-mono">${p.reversed}</b></span><span class="text-brand-emerald font-semibold">${p.isCenter ? 'แกน Center' : 'คะแนน ' + p.score.toFixed(0)}</span></div>
             </div>`).join('')}
         </div>
