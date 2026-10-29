@@ -28,6 +28,6 @@ test('lunar phase is waxing/waning with kham 1-15', () => {
 
 test('backtest counts are consistent', () => {
   const bt = runBacktest(HISTORICAL_DRAWS);
-  assert.equal(bt.total, 25);
+  assert.equal(bt.total, 120);
   assert.ok(bt.coreHits <= bt.anyHits && bt.anyHits <= bt.total);
 });
