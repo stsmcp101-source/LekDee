@@ -3,7 +3,13 @@ import { trioBaseline } from './engine.js';
 
 // หวยลาวไม่มีตารางกำลังวันของตัวเอง จึงใช้สถิติเลขจากผลย้อนหลัง + ตารางกำลังวันของไทยเป็นส่วนเสริมเล็กน้อย
 export const LAO_WEIGHTS = { all: 0.5, recent: 0.5, day: 0.15, recentN: 30 };
-const POOL_SIZE = 7;
+export const LAO_PAIR_OPTIONS = [8, 17, 28];
+// เลือกกลุ่มเลขให้ใหญ่พอที่จะจับคู่ได้ครบตามจำนวนที่ต้องการ
+const poolSizeFor = (pairCount) => {
+  let n = 7;
+  while ((n * (n - 1)) / 2 < pairCount) n++;
+  return n;
+};
 const MIN_HISTORY = 30;
 
 export function nextDrawDate(from = new Date()) {
@@ -42,7 +48,7 @@ export function runLaoEngine(history, dayIdx, { pairCount = 8, weights = LAO_WEI
   for (let d = 0; d <= 9; d++) probMap[d] = Math.round((raw[d] / total) * 1000) / 10;
 
   const sortedDigits = [...Array(10).keys()].sort((a, b) => probMap[b] - probMap[a] || a - b);
-  const pool = sortedDigits.slice(0, POOL_SIZE);
+  const pool = sortedDigits.slice(0, poolSizeFor(pairCount));
 
   const pairs = [];
   for (let i = 0; i < pool.length; i++)

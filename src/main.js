@@ -3,7 +3,7 @@ import { THAI_DAYS, TABLES_DATA, HISTORICAL_DRAWS, QUICK_DRAWS } from './data.js
 import { calculateThaiLunar, formatThaiDate, moonIcon, parseISO, shortThaiDate, toISO } from './lunar.js';
 import { runEngine, runBacktest, tuneTrainTest, PAIR_COUNT_OPTIONS, DEFAULT_PAIR_COUNT } from './engine.js';
 import { LAO_DRAWS } from './lao-data.js';
-import { runLaoEngine, runLaoBacktest, nextDrawDate, laoPairBaseline } from './lao.js';
+import { runLaoEngine, runLaoBacktest, nextDrawDate, LAO_PAIR_OPTIONS } from './lao.js';
 import * as store from './store.js';
 
 /* ------------------------------------------------------------------ state */
@@ -18,6 +18,7 @@ const state = {
   refSub: 'day',
   btFilter: 'all',
   pairCount: readPairCount(),
+  laoPairCount: 17,
   tune: null,
   tuning: false,
   result: null,
@@ -316,12 +317,15 @@ async function saveCurrent() {
 }
 
 /* ------------------------------------------------------------------ backtest */
-function pairCountPicker() {
+function pairCountPicker(lao = false) {
+  const opts = lao ? LAO_PAIR_OPTIONS : PAIR_COUNT_OPTIONS;
+  const cur = lao ? state.laoPairCount : state.pairCount;
+  const attr = lao ? 'data-laopaircount' : 'data-paircount';
   return `
     <div class="flex items-center justify-between gap-2 text-xs">
       <span class="text-slate-500">จำนวนชุดเด่น</span>
       <div class="flex gap-1 bg-surface-muted p-1 rounded-lg border border-surface-border">
-        ${PAIR_COUNT_OPTIONS.map((n) => `<button data-paircount="${n}" class="px-3 py-1 rounded-md ${state.pairCount === n ? 'bg-surface-card text-brand-emerald font-semibold shadow-sm' : 'text-brand-slate'}">${n} คู่</button>`).join('')}
+        ${opts.map((n) => `<button ${attr}="${n}" class="px-3 py-1 rounded-md ${cur === n ? 'bg-surface-card text-brand-emerald font-semibold shadow-sm' : 'text-brand-slate'}">${n} คู่</button>`).join('')}
       </div>
     </div>`;
 }
@@ -454,8 +458,8 @@ async function submitDraw(form) {
 /* ------------------------------------------------------------------ lao pattana */
 function renderLao() {
   const next = nextDrawDate();
-  const r = runLaoEngine(LAO_DRAWS, next.getDay(), { pairCount: state.pairCount });
-  const bt = runLaoBacktest(LAO_DRAWS, { pairCount: state.pairCount });
+  const r = runLaoEngine(LAO_DRAWS, next.getDay(), { pairCount: state.laoPairCount });
+  const bt = runLaoBacktest(LAO_DRAWS, { pairCount: state.laoPairCount });
   const hitMap = new Map(bt.rows.map((x) => [x.draw.date, x]));
   const first = LAO_DRAWS[0].date;
   const last = LAO_DRAWS[LAO_DRAWS.length - 1];
@@ -510,7 +514,7 @@ function renderLao() {
           </div>
           <button data-copy="lao-core" class="shrink-0 px-2.5 py-1 text-xs font-semibold rounded-lg bg-surface-muted border border-surface-border">คัดลอก</button>
         </div>
-        ${pairCountPicker()}
+        ${pairCountPicker(true)}
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           ${r.corePairs.map((p, i) => `<div class="p-2.5 rounded-xl bg-amber-50/50 border border-amber-200"><div class="flex items-center justify-between"><span class="text-xl font-black font-mono text-brand-goldDark tracking-wider">${p.pair}</span><span class="text-[10px] px-1.5 rounded bg-amber-100 text-brand-goldDark border border-amber-300 font-bold">#${i + 1}</span></div><div class="text-[10px] text-slate-500 mt-1">กลับ <b class="font-mono">${p.reversed}</b></div></div>`).join('')}
         </div>
@@ -540,7 +544,7 @@ function renderLao() {
         ${kpi('เข้าชุดเด่น+กัน', pct(bt.anyHits / bt.total, 0), `${bt.anyHits}/${bt.total} งวด · ${bt.avgAll.toFixed(0)} คู่`, pct(bt.anyBaseline, 0))}
         ${kpi('ชุด 3 ตัว', pct(bt.trioHits / bt.total, 1), `${bt.trioHits}/${bt.total} งวด · ${bt.avgTrio.toFixed(0)} ชุด`, pct(bt.trioBaseline, 1))}
       </div>
-      <p class="text-xs p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-brand-goldDark">ถ้าผลใกล้เคียงหรือต่ำกว่า “สุ่มล้วน” แปลว่าสถิติย้อนหลังไม่ช่วยให้เดาแม่นขึ้น หวยลาวเป็นการสุ่มโดยแท้</p>
+      <p class="text-xs p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-brand-goldDark">ลองวิธีเลือกเลขแล้ว 4 แบบ (เลขที่ออกบ่อย, ออกบ่อยช่วง 30 งวดหลัง, เลขที่ออกน้อย, เลขที่หายไปนาน) ทุกแบบได้ผลใกล้เคียง “สุ่มล้วน” และการกระจายของเลข 0–9 ใน ${LAO_DRAWS.length} งวดไม่ต่างจากการสุ่มอย่างมีนัยสำคัญ (χ² = 14.1 จากเกณฑ์ 16.9) ตัวเลขจะถึง 55% ได้เมื่อซื้อ ~28 คู่ (56 เลข) ซึ่งมาจากการครอบคลุมเลขมากขึ้น ไม่ใช่เพราะสูตรแม่น</p>
     </section>
 
     <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-2">
@@ -629,7 +633,7 @@ document.addEventListener('click', async (e) => {
     return compute();
   }
   if (d.copy === 'lao-core' || d.copy === 'lao-trio') {
-    const lr = runLaoEngine(LAO_DRAWS, nextDrawDate().getDay(), { pairCount: state.pairCount });
+    const lr = runLaoEngine(LAO_DRAWS, nextDrawDate().getDay(), { pairCount: state.laoPairCount });
     const list = d.copy === 'lao-core' ? lr.corePairs.map((p) => p.pair) : lr.trioSets.map((x) => x.code);
     await copyText(list.join(', '));
     return toast('คัดลอกแล้ว: ' + list.join(', '));
@@ -643,6 +647,10 @@ document.addEventListener('click', async (e) => {
     };
     await copyText(map[d.copy].join(', '));
     return toast('คัดลอกแล้ว: ' + map[d.copy].join(', '));
+  }
+  if (d.laopaircount) {
+    state.laoPairCount = Number(d.laopaircount);
+    return renderLao();
   }
   if (d.paircount) {
     state.pairCount = Number(d.paircount);
