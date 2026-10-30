@@ -1,12 +1,14 @@
 import { parseKhaosodList, parseKhaosodArticle } from '../_lib/parse.js';
 import { saveDraws, existingDates, authorize } from '../_lib/db.js';
 
-const UA = 'Mozilla/5.0 (compatible; LekDeeBot/1.0)';
+// บอกตัวตนตามจริงว่าเป็นบอท ไม่ปลอมเป็นเบราว์เซอร์ — ถ้าเว็บต้นทางไม่อนุญาต ต้องเปลี่ยนแหล่งข้อมูล
+const HEADERS = { 'User-Agent': 'LekDeeBot/1.0 (daily lottery result sync)', 'Accept-Language': 'th' };
 
 async function getText(url) {
-  const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'th' } });
-  if (!r.ok) throw new Error(`${url} -> HTTP ${r.status}`);
-  return r.text();
+  const r = await fetch(url, { headers: HEADERS, redirect: 'follow' });
+  const body = await r.text();
+  if (!r.ok) throw new Error(`${url} -> HTTP ${r.status}: ${body.slice(0, 120).replace(/\s+/g, ' ')}`);
+  return body;
 }
 
 // ตั้งเวลา 22:00 น. (เวลาไทย) วันจันทร์–ศุกร์ — ดูที่ vercel.json
@@ -26,6 +28,7 @@ export default async function handler(req, res) {
     if (!dry) await saveDraws(fresh);
     res.status(200).json({ ok: true, dry, checked: links.length, saved: fresh, unreadable: skipped });
   } catch (e) {
+    console.error('[cron/lao] failed:', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 }

@@ -40,6 +40,7 @@ export default async function handler(req, res) {
     if (!dry) await saveDraws(fresh);
     res.status(200).json({ ok: true, dry, saved: fresh });
   } catch (e) {
+    console.error('[cron/thai] failed:', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 }
