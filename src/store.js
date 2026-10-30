@@ -25,6 +25,19 @@ export async function initStore() {
   }
 }
 
+/* ---------- official draws (fetched daily by the Vercel cron) ---------- */
+export async function listOfficialDraws() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.from('official_draws').select('lottery, draw_date, p1, p2').order('draw_date', { ascending: false }).limit(400);
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.warn('official_draws unavailable:', err.message);
+    return [];
+  }
+}
+
 /* ---------- local fallback ---------- */
 const readLocal = (name) => {
   try {

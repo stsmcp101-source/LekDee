@@ -90,3 +90,20 @@ for (const item of OLDER_RAW.split(';')) {
   const l = calculateThaiLunar(dt);
   HISTORICAL_DRAWS.push({ date, p1, p2, dayIdx: dt.getDay(), lunar: l.phase, kham: l.kham });
 }
+
+// รวมผลรางวัลที่ระบบดึงมาเก็บไว้ (ตาราง official_draws) เข้ากับข้อมูลที่ฝังมากับแอป
+export function mergeThaiDraws(rows) {
+  const seen = new Set(HISTORICAL_DRAWS.map((x) => x.date));
+  let added = 0;
+  for (const r of rows) {
+    if (r.lottery !== 'thai' || !r.p2 || seen.has(r.draw_date)) continue;
+    const [y, m, dd] = r.draw_date.split('-').map(Number);
+    const dt = new Date(y, m - 1, dd);
+    const l = calculateThaiLunar(dt);
+    HISTORICAL_DRAWS.push({ date: r.draw_date, p1: r.p1, p2: r.p2, dayIdx: dt.getDay(), lunar: l.phase, kham: l.kham });
+    seen.add(r.draw_date);
+    added++;
+  }
+  if (added) HISTORICAL_DRAWS.sort((a, b) => b.date.localeCompare(a.date));
+  return added;
+}

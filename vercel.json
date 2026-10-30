@@ -1,5 +1,9 @@
 {
   "framework": "vite",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "crons": [
+    { "path": "/api/cron/thai", "schedule": "0 11 * * *" },
+    { "path": "/api/cron/lao", "schedule": "0 15 * * 1-5" }
+  ]
 }

@@ -1,8 +1,8 @@
 import './style.css';
-import { THAI_DAYS, TABLES_DATA, HISTORICAL_DRAWS, QUICK_DRAWS } from './data.js';
+import { THAI_DAYS, TABLES_DATA, HISTORICAL_DRAWS, QUICK_DRAWS, mergeThaiDraws } from './data.js';
 import { calculateThaiLunar, formatThaiDate, moonIcon, parseISO, shortThaiDate, toISO } from './lunar.js';
 import { runEngine, runBacktest, tuneTrainTest, PAIR_COUNT_OPTIONS, DEFAULT_PAIR_COUNT } from './engine.js';
-import { LAO_DRAWS } from './lao-data.js';
+import { LAO_DRAWS, mergeLaoDraws } from './lao-data.js';
 import { runLaoEngine, runLaoBacktest, nextDrawDate, LAO_PAIR_OPTIONS } from './lao.js';
 import * as store from './store.js';
 
@@ -732,6 +732,11 @@ async function boot() {
   await store.initStore();
   $('storageBadge').textContent = store.mode() === 'cloud' ? '☁ ซิงก์แล้ว' : '📱 ในเครื่อง';
   await loadDraws();
+  const official = await store.listOfficialDraws();
+  if (mergeThaiDraws(official) + mergeLaoDraws(official) > 0) {
+    if (state.tab === 'backtest') renderBacktest();
+    if (state.tab === 'lao') renderLao();
+  }
   if ('serviceWorker' in navigator && import.meta.env.PROD) navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 boot();

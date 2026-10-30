@@ -37,3 +37,21 @@ create policy "own analyses" on public.analyses
 
 create policy "own draws" on public.draws
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ผลรางวัลทางการ (หวยไทย/หวยลาว) ที่งานตั้งเวลาบน Vercel ดึงมาเก็บให้ทุกคนใช้ร่วมกัน
+-- ทุกคนอ่านได้ แต่เขียนได้เฉพาะ service role key ของเซิร์ฟเวอร์ (ไม่มี policy เขียน)
+create table if not exists public.official_draws (
+  id          uuid primary key default gen_random_uuid(),
+  lottery     text not null check (lottery in ('thai', 'lao')),
+  draw_date   date not null,
+  p1          text not null check (p1 ~ '^[0-9]{6}$'),   -- รางวัลที่ 1 (ไทย) / เลข 6 ตัว (ลาว)
+  p2          text check (p2 ~ '^[0-9]{2}$'),            -- เลขท้าย 2 ตัวล่าง (เฉพาะหวยไทย)
+  created_at  timestamptz not null default now(),
+  unique (lottery, draw_date),
+  check (lottery <> 'thai' or p2 is not null)
+);
+
+alter table public.official_draws enable row level security;
+
+create policy "anyone can read official draws" on public.official_draws
+  for select to anon, authenticated using (true);

@@ -10,3 +10,18 @@ export const LAO_DRAWS = RAW.split(';')
     return { date, n6, last2: n6.slice(-2), last3: n6.slice(-3), last4: n6.slice(-4) };
   })
   .sort((a, b) => a.date.localeCompare(b.date));
+
+// รวมผลรางวัลที่ระบบดึงมาเก็บไว้ (ตาราง official_draws) เข้ากับข้อมูลที่ฝังมากับแอป
+export function mergeLaoDraws(rows) {
+  const seen = new Set(LAO_DRAWS.map((x) => x.date));
+  let added = 0;
+  for (const r of rows) {
+    if (r.lottery !== 'lao' || seen.has(r.draw_date)) continue;
+    const n6 = r.p1;
+    LAO_DRAWS.push({ date: r.draw_date, n6, last2: n6.slice(-2), last3: n6.slice(-3), last4: n6.slice(-4) });
+    seen.add(r.draw_date);
+    added++;
+  }
+  if (added) LAO_DRAWS.sort((a, b) => a.date.localeCompare(b.date));
+  return added;
+}
