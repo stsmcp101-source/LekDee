@@ -50,7 +50,7 @@ test('merge adds only unseen draws and keeps order', () => {
   const rows = [
     { lottery: 'thai', draw_date: '2026-11-01', p1: '123456', p2: '78' },
     { lottery: 'thai', draw_date: '2026-10-16', p1: '011781', p2: '48' }, // มีอยู่แล้ว
-    { lottery: 'lao', draw_date: '2026-10-29', p1: '246810' },
+    { lottery: 'lao', draw_date: '2026-10-30', p1: '246810' },
     { lottery: 'lao', draw_date: '2026-10-28', p1: '740618' }, // มีอยู่แล้ว
   ];
   assert.equal(mergeThaiDraws(rows), 1);
