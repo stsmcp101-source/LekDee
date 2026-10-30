@@ -12,6 +12,7 @@ export const LAO_DRAWS = RAW.split(';')
   .sort((a, b) => a.date.localeCompare(b.date));
 
 // รวมผลรางวัลที่ระบบดึงมาเก็บไว้ (ตาราง official_draws) เข้ากับข้อมูลที่ฝังมากับแอป
+// งวดที่ดึงอัตโนมัติอาจมีเฉพาะเลขท้าย 4 ตัว (n6 ยาว 4) — ส่วนอื่นของแอปใช้แค่ 2–4 ตัวท้ายจึงไม่กระทบ
 export function mergeLaoDraws(rows) {
   const seen = new Set(LAO_DRAWS.map((x) => x.date));
   let added = 0;

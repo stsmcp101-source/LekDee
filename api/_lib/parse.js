@@ -1,13 +1,5 @@
 // ตัวแปลงข้อมูลจากแหล่งผลรางวัล — ฟังก์ชันล้วน ไม่แตะเครือข่าย เพื่อให้ทดสอบได้
 
-const MONTHS = {
-  มกราคม: 1, กุมภาพันธ์: 2, มีนาคม: 3, เมษายน: 4, พฤษภาคม: 5, มิถุนายน: 6,
-  กรกฎาคม: 7, สิงหาคม: 8, กันยายน: 9, ตุลาคม: 10, พฤศจิกายน: 11, ธันวาคม: 12,
-};
-const MONTH_RE = Object.keys(MONTHS).join('|');
-
-const pad = (n) => String(n).padStart(2, '0');
-
 /** ผลสลากกินแบ่งรัฐบาลไทย จาก API ของ glo.or.th (getLotteryResult) */
 export function parseGloResult(json) {
   const result = json?.response?.result;
@@ -18,37 +10,29 @@ export function parseGloResult(json) {
   return { lottery: 'thai', draw_date: result.date, p1, p2 };
 }
 
-/** ลิงก์บทความผลหวยลาวจากหน้ารวมของข่าวสด (ใหม่สุดก่อน) */
-export function parseKhaosodList(html, limit = 8) {
-  const out = [];
-  for (const m of html.matchAll(/href="([^"]*laolottery\/news_\d+)"/g)) {
-    const url = new URL(m[1], 'https://www.khaosod.co.th').href;
-    if (!out.includes(url)) out.push(url);
-    if (out.length >= limit) break;
-  }
-  return out;
-}
-
-function htmlToText(html) {
-  return html
+/**
+ * ผลหวยลาวพัฒนาจากหน้าสถิติของ horoscope.thaiorc.com (ตารางวันที่ / เลข 4 ตัว / 3 ตัว / 2 ตัว)
+ * เว็บนี้ลงเลขท้าย 4 ตัว ไม่มีเลข 6 ตัวเต็ม — เก็บ 4 หลักไว้ใน p1
+ * ตรวจว่า 3 ตัวและ 2 ตัวสอดคล้องกับ 4 ตัว แถวที่ไม่สอดคล้องจะถูกข้าม
+ */
+export function parseThaiorcLao(html) {
+  const text = html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ');
-}
-
-/** ผลหวยลาวพัฒนาจากบทความข่าวสด — คืน null ถ้าอ่านไม่ได้หรือเลขท้ายไม่สอดคล้องกัน */
-export function parseKhaosodArticle(html) {
-  const text = htmlToText(html);
-  const dm = text.match(new RegExp(`งวด(?:ล่าสุด|ประจำ)?วันที่\\s*(\\d{1,2})\\s*(${MONTH_RE})\\s*(\\d{4})`));
-  const nm = text.match(/รางวัลเลข\s*6\s*ตัว\s*:?\s*(\d{6})/);
-  if (!dm || !nm) return null;
-  const n6 = nm[1];
-  const l4 = text.match(/เลขท้าย\s*4\s*ตัว\s*:?\s*(\d{4})/)?.[1];
-  const l2 = text.match(/เลขท้าย\s*2\s*ตัว\s*:?\s*(\d{2})/)?.[1];
-  if ((l4 && l4 !== n6.slice(-4)) || (l2 && l2 !== n6.slice(-2))) return null;
-  const year = Number(dm[3]) - 543;
-  return { lottery: 'lao', draw_date: `${year}-${pad(MONTHS[dm[2]])}-${pad(dm[1])}`, p1: n6, p2: null };
+  // แต่ละแถวมีวันที่ซ้ำหลายรอบ (ฟอนต์ต่างขนาดจอ) ตามด้วยเลข 4 / 3 / 2 ตัว
+  const re = /(\d{2})\/(\d{2})\/(\d{4})(?:\s+\d{2}\/\d{2}\/\d{4})*\s+(\d{4})\s+(\d{3})\s+(\d{2})(?!\d)/g;
+  const rows = [];
+  const seen = new Set();
+  for (const m of text.matchAll(re)) {
+    const [, d, mo, y, n4, n3, n2] = m;
+    if (n4.slice(-3) !== n3 || n3.slice(-2) !== n2) continue;
+    const date = `${Number(y) - 543}-${mo}-${d}`;
+    if (seen.has(date)) continue;
+    seen.add(date);
+    rows.push({ lottery: 'lao', draw_date: date, p1: n4, p2: null });
+  }
+  return rows;
 }

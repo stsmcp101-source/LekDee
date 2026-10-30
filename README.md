@@ -38,7 +38,7 @@ npm test
 | งาน | เวลา (ไทย) | ที่มาข้อมูล |
 |---|---|---|
 | `/api/cron/thai` | ทุกวัน 18:00 (ย้อนดู 4 วันเผื่อพลาด) | API ของ glo.or.th |
-| `/api/cron/lao` | จันทร์–ศุกร์ 22:00 | หน้าหวยลาวของข่าวสด (khaosod.co.th) |
+| `/api/cron/lao` | จันทร์–ศุกร์ 22:00 | หน้าสถิติหวยลาว 1 ปีของ horoscope.thaiorc.com (เลขท้าย 4 ตัว) |
 
 ตั้งค่า (ครั้งเดียว):
 1. Supabase → SQL Editor → รันส่วน `official_draws` ท้ายไฟล์ `supabase/schema.sql`
@@ -53,4 +53,13 @@ npm test
 curl -H "Authorization: Bearer $CRON_SECRET" "https://<โดเมนของคุณ>/api/cron/lao?dry=1"
 ```
 หมายเหตุ: แผน Hobby ของ Vercel รันตามชั่วโมงที่ตั้งแต่เวลาอาจเหลื่อมได้ไม่เกิน 59 นาที (เช่น 18:00–18:59)
-ถ้าแหล่งข้อมูลเปลี่ยนรูปแบบหน้าเว็บ งาน lao จะรายงานในช่อง `unreadable` และต้องปรับ `api/_lib/parse.js`
+ถ้าแหล่งข้อมูลเปลี่ยนรูปแบบหรือบล็อกบอท งาน lao จะตอบ 500 และเขียนสาเหตุลง Logs (ค้นหา `[cron/lao] failed`) ให้ปรับ `api/_lib/parse.js` หรือเปลี่ยนแหล่ง โดยไม่ปลอมตัวเป็นเบราว์เซอร์
+
+### ถ้าสร้างตาราง `official_draws` ไปแล้วก่อนหน้านี้ (รองรับเลขหวยลาว 4 หลัก)
+รันใน Supabase SQL Editor หนึ่งครั้ง:
+```sql
+alter table public.official_draws drop constraint if exists official_draws_p1_check;
+alter table public.official_draws add constraint official_draws_p1_check check (p1 ~ '^[0-9]{4,6}$');
+alter table public.official_draws drop constraint if exists official_draws_check;
+alter table public.official_draws add constraint official_draws_check check (lottery <> 'thai' or (p2 is not null and length(p1) = 6));
+```

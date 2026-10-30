@@ -492,7 +492,7 @@ function renderLao() {
       </div>
       <div class="p-3 rounded-xl bg-surface-muted/60 border border-surface-border flex items-center justify-between gap-3">
         <div><span class="text-[11px] text-brand-slate block">ผลล่าสุด · ${shortThaiDate(last.date)}</span>
-          <span class="font-mono text-xl font-black tracking-widest">${last.n6.slice(0, 3)}<span class="text-brand-emerald">${last.n6.slice(3)}</span></span></div>
+          <span class="font-mono text-xl font-black tracking-widest">${last.n6.slice(0, -3)}<span class="text-brand-emerald">${last.n6.slice(-3)}</span></span></div>
         <div class="text-right text-[11px] text-slate-500">3 ตัวท้าย <b class="font-mono text-brand-navy">${last.last3}</b><br>2 ตัวท้าย <b class="font-mono text-brand-emerald">${last.last2}</b></div>
       </div>
       <p class="text-[11px] text-slate-500">วิเคราะห์จากสถิติเลข ${LAO_DRAWS.length} งวดล่าสุด (${shortThaiDate(first)}–${shortThaiDate(last.date)}) ร่วมกับตารางกำลังวันเล็กน้อย</p>
@@ -560,7 +560,7 @@ function renderLao() {
           const h = hitMap.get(d.date);
           return `<div class="py-2 flex items-center justify-between gap-2 text-sm">
             <div><b>${shortThaiDate(d.date)}</b> <span class="text-[11px] text-slate-400">${THAI_DAYS[new Date(d.date + 'T12:00:00').getDay()]}</span></div>
-            <div class="font-mono">${d.n6.slice(0, 3)}<b class="text-brand-emerald">${d.n6.slice(3)}</b></div>
+            <div class="font-mono">${d.n6.slice(0, -3)}<b class="text-brand-emerald">${d.n6.slice(-3)}</b></div>
             <span class="w-14 text-center text-[10px] px-1.5 py-0.5 rounded-full border ${h ? (h.anyHit ? 'bg-emerald-50 text-brand-emerald border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200') : 'text-slate-300 border-transparent'}">${h ? (h.anyHit ? 'เข้า ✓' : 'หลุด') : 'ตั้งต้น'}</span>
           </div>`;
         }).join('')}
@@ -623,8 +623,8 @@ function renderCheck() {
       <div class="p-4 space-y-3">
         <div class="text-center">
           <p class="text-[11px] text-slate-400">${dayNameOf(draw.date)}ที่ ${shortThaiDate(draw.date)}</p>
-          <p class="text-[11px] text-slate-500 mt-1">${isThai ? 'รางวัลที่ 1' : 'เลขรางวัล 6 ตัว'}</p>
-          <span class="font-mono text-3xl font-black tracking-widest">${full.slice(0, 3)}<span class="${hi}">${full.slice(3)}</span></span>
+          <p class="text-[11px] text-slate-500 mt-1">${isThai ? 'รางวัลที่ 1' : (full.length < 6 ? 'เลขรางวัล (4 ตัวท้าย)' : 'เลขรางวัล 6 ตัว')}</p>
+          <span class="font-mono text-3xl font-black tracking-widest">${full.slice(0, -3)}<span class="${hi}">${full.slice(-3)}</span></span>
         </div>
         <div class="grid grid-cols-3 gap-2">
           ${subs.map(([l, v]) => `<div class="p-2.5 rounded-xl border border-surface-border text-center"><span class="block text-[10px] text-slate-400">${l}</span><span class="font-mono text-xl font-black ${hi}">${v}</span></div>`).join('')}
@@ -647,7 +647,7 @@ function renderCheck() {
           const tail = isThai ? `บน ${d.p1.slice(-2)} · ล่าง ${d.p2}` : `4 ตัว ${d.n6.slice(-4)}`;
           return `<button data-cidx="${i}" class="w-full py-2 px-1 flex items-center justify-between gap-2 text-left ${i === state.checkIdx ? (isThai ? 'bg-emerald-50' : 'bg-red-50') : ''}">
             <span class="text-sm"><b>${shortThaiDate(d.date)}</b> <span class="text-[11px] text-slate-400">${dayNameOf(d.date)}</span></span>
-            <span class="font-mono text-sm">${f.slice(0, 4)}<b class="${hi}">${f.slice(4)}</b></span>
+            <span class="font-mono text-sm">${f.slice(0, -2)}<b class="${hi}">${f.slice(-2)}</b></span>
             <span class="text-[11px] text-slate-500 font-mono">${tail}</span>
           </button>`;
         }).join('')}

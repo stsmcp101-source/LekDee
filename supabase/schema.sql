@@ -44,7 +44,18 @@ create table if not exists public.official_draws (
   id          uuid primary key default gen_random_uuid(),
   lottery     text not null check (lottery in ('thai', 'lao')),
   draw_date   date not null,
-  p1          text not null check (p1 ~ '^[0-9]{6}$'),   -- รางวัลที่ 1 (ไทย) / เลข 6 ตัว (ลาว)
+  p1          text not null check (p1 ~ '^[0-9]{4,6}
+  p2          text check (p2 ~ '^[0-9]{2}$'),            -- เลขท้าย 2 ตัวล่าง (เฉพาะหวยไทย)
+  created_at  timestamptz not null default now(),
+  unique (lottery, draw_date),
+  check (lottery <> 'thai' or (p2 is not null and length(p1) = 6))
+);
+
+alter table public.official_draws enable row level security;
+
+create policy "anyone can read official draws" on public.official_draws
+  for select to anon, authenticated using (true);
+), -- รางวัลที่ 1 6 หลัก (ไทย) / เลขท้าย 4 หลัก (ลาว)
   p2          text check (p2 ~ '^[0-9]{2}$'),            -- เลขท้าย 2 ตัวล่าง (เฉพาะหวยไทย)
   created_at  timestamptz not null default now(),
   unique (lottery, draw_date),
