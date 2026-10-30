@@ -4,6 +4,7 @@ import { calculateThaiLunar, formatThaiDate, moonIcon, parseISO, shortThaiDate, 
 import { runEngine, runBacktest, tuneTrainTest, PAIR_COUNT_OPTIONS, DEFAULT_PAIR_COUNT } from './engine.js';
 import { LAO_DRAWS, mergeLaoDraws } from './lao-data.js';
 import { runLaoEngine, runLaoBacktest, nextDrawDate, LAO_PAIR_OPTIONS } from './lao.js';
+import { checkThai, checkLao, VALID_LENGTHS } from './check.js';
 import * as store from './store.js';
 
 /* ------------------------------------------------------------------ state */
@@ -19,6 +20,9 @@ const state = {
   btFilter: 'all',
   pairCount: readPairCount(),
   laoPairCount: 17,
+  checkKind: 'thai',
+  checkIdx: 0,
+  checkNum: '',
   tune: null,
   tuning: false,
   result: null,
@@ -42,6 +46,7 @@ const pct = (n, d = 1) => `${(n * 100).toFixed(d)}%`;
 const TABS = [
   { id: 'dashboard', label: 'วิเคราะห์', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   { id: 'backtest', label: 'ย้อนหลัง', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+  { id: 'check', label: 'ตรวจผล', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
   { id: 'lao', label: 'หวยลาว', icon: 'M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9' },
   { id: 'reference', label: 'ตาราง', icon: 'M3 10h18M3 14h18M10 3v18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z' },
   { id: 'history', label: 'ประวัติ', icon: 'M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z' },
@@ -105,6 +110,7 @@ function switchTab(id) {
   if (id === 'backtest') renderBacktest();
   if (id === 'history') loadHistory();
   if (id === 'lao') renderLao();
+  if (id === 'check') renderCheck();
   window.scrollTo({ top: 0 });
 }
 
@@ -562,6 +568,93 @@ function renderLao() {
     </section>`;
 }
 
+/* ------------------------------------------------------------------ check results */
+const checkDraws = () => (state.checkKind === 'thai' ? HISTORICAL_DRAWS : [...LAO_DRAWS].reverse());
+const dayNameOf = (iso) => THAI_DAYS[parseISO(iso).getDay()];
+
+function checkResultHTML() {
+  const kind = state.checkKind;
+  const draws = checkDraws();
+  const draw = draws[state.checkIdx] || draws[0];
+  const num = state.checkNum;
+  const allowed = VALID_LENGTHS[kind];
+  if (!num) return `<p class="text-xs text-slate-400">พิมพ์เลขที่ต้องการตรวจ (${allowed.join(' / ')} หลัก)</p>`;
+  if (!allowed.includes(num.length)) return `<p class="text-xs text-amber-600">ตรวจได้เฉพาะเลข ${allowed.join(' / ')} หลัก — ตอนนี้พิมพ์ ${num.length} หลัก</p>`;
+  const res = kind === 'thai' ? checkThai(num, draw) : checkLao(num, draw);
+  const won = res.some((r) => r.hit);
+  return `
+    <div class="p-3 rounded-xl border ${won ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-surface-border'}">
+      <p class="text-sm font-bold ${won ? 'text-brand-emerald' : 'text-slate-500'}">${won ? '🎉 ถูกรางวัล!' : 'ไม่ถูกรางวัลในงวดนี้'}</p>
+      <p class="text-[11px] text-slate-500 mb-2">เลข <b class="font-mono text-brand-navy">${esc(num)}</b> · งวด ${shortThaiDate(draw.date)}</p>
+      <div class="grid grid-cols-2 gap-2">
+        ${res.map((r) => `<div class="px-2.5 py-1.5 rounded-lg text-xs border flex items-center justify-between ${r.hit ? 'bg-emerald-100 border-emerald-300 text-brand-emerald font-semibold' : 'bg-white border-surface-border text-slate-400'}"><span>${r.label}</span><span>${r.hit ? '✓ ถูก' : '✗'}</span></div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderCheck() {
+  const kind = state.checkKind;
+  const isThai = kind === 'thai';
+  const draws = checkDraws();
+  if (state.checkIdx >= draws.length) state.checkIdx = 0;
+  const draw = draws[state.checkIdx];
+  const hi = isThai ? 'text-brand-emerald' : 'text-red-600';
+  const full = isThai ? draw.p1 : draw.n6;
+  const subs = isThai
+    ? [['3 ตัวท้าย (บน)', draw.p1.slice(-3)], ['2 ตัวบน', draw.p1.slice(-2)], ['2 ตัวล่าง', draw.p2]]
+    : [['4 ตัวท้าย', draw.n6.slice(-4)], ['3 ตัวท้าย', draw.n6.slice(-3)], ['2 ตัวท้าย', draw.n6.slice(-2)]];
+
+  $('view-check').innerHTML = `
+    <div class="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-surface-muted border border-surface-border">
+      <button data-ckind="thai" class="py-2.5 rounded-xl text-sm font-bold ${isThai ? 'bg-brand-emerald text-white shadow-emeraldGlow' : 'text-brand-slate'}">🇹🇭 หวยไทย <span class="text-[10px] font-normal opacity-80">รัฐบาล</span></button>
+      <button data-ckind="lao" class="py-2.5 rounded-xl text-sm font-bold ${!isThai ? 'bg-red-600 text-white shadow' : 'text-brand-slate'}">🇱🇦 หวยลาว <span class="text-[10px] font-normal opacity-80">พัฒนา</span></button>
+    </div>
+
+    <section class="rounded-2xl overflow-hidden border ${isThai ? 'border-emerald-200' : 'border-red-200'} shadow-card bg-surface-card">
+      <div class="px-4 py-2.5 ${isThai ? 'bg-emerald-50' : 'bg-red-50'} flex items-center justify-between gap-2">
+        <div>
+          <h2 class="text-sm font-bold ${isThai ? 'text-brand-emeraldDark' : 'text-red-700'}">${isThai ? 'ผลสลากกินแบ่งรัฐบาลไทย' : 'ผลสลากพัฒนา สปป.ลาว'}</h2>
+          <p class="text-[11px] text-slate-500">${isThai ? 'ออกรางวัลวันที่ 1 และ 16 ของเดือน' : 'ออกรางวัลจันทร์–ศุกร์ เวลา 20.00 น.'}</p>
+        </div>
+        <select id="checkDraw" class="max-w-[48%] bg-white border border-surface-border rounded-lg px-2 py-1.5 text-xs">
+          ${draws.slice(0, 60).map((d, i) => `<option value="${i}" ${i === state.checkIdx ? 'selected' : ''}>${shortThaiDate(d.date)}${i === 0 ? ' (ล่าสุด)' : ''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="p-4 space-y-3">
+        <div class="text-center">
+          <p class="text-[11px] text-slate-400">${dayNameOf(draw.date)}ที่ ${shortThaiDate(draw.date)}</p>
+          <p class="text-[11px] text-slate-500 mt-1">${isThai ? 'รางวัลที่ 1' : 'เลขรางวัล 6 ตัว'}</p>
+          <span class="font-mono text-3xl font-black tracking-widest">${full.slice(0, 3)}<span class="${hi}">${full.slice(3)}</span></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          ${subs.map(([l, v]) => `<div class="p-2.5 rounded-xl border border-surface-border text-center"><span class="block text-[10px] text-slate-400">${l}</span><span class="font-mono text-xl font-black ${hi}">${v}</span></div>`).join('')}
+        </div>
+        ${isThai ? '<p class="text-[10px] text-slate-400">* ระบบเก็บเฉพาะรางวัลที่ 1 และเลขท้าย 2 ตัว ไม่รวมเลขหน้า 3 ตัว เลขท้าย 3 ตัว และรางวัลอื่น ๆ โปรดตรวจสลากกับ glo.or.th อีกครั้ง</p>' : ''}
+      </div>
+    </section>
+
+    <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-3">
+      <h3 class="text-sm font-bold">🎫 ตรวจเลขของคุณ <span class="text-[11px] font-normal text-slate-400">กับงวด ${shortThaiDate(draw.date)}</span></h3>
+      <input id="checkNum" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="พิมพ์เลข ${VALID_LENGTHS[kind].join(' / ')} หลัก" value="${esc(state.checkNum)}" class="w-full font-mono text-xl tracking-widest bg-surface-muted/60 border border-surface-borderDark rounded-xl px-4 py-3 focus:outline-none">
+      <div id="checkResult">${checkResultHTML()}</div>
+    </section>
+
+    <section class="bg-surface-card border border-surface-border rounded-2xl p-4 shadow-card space-y-2">
+      <h3 class="text-sm font-bold">ผลย้อนหลัง ${Math.min(draws.length, 30)} งวดล่าสุด <span class="text-[11px] font-normal text-slate-400">แตะเพื่อเลือกงวด</span></h3>
+      <div class="divide-y divide-surface-border">
+        ${draws.slice(0, 30).map((d, i) => {
+          const f = isThai ? d.p1 : d.n6;
+          const tail = isThai ? `บน ${d.p1.slice(-2)} · ล่าง ${d.p2}` : `4 ตัว ${d.n6.slice(-4)}`;
+          return `<button data-cidx="${i}" class="w-full py-2 px-1 flex items-center justify-between gap-2 text-left ${i === state.checkIdx ? (isThai ? 'bg-emerald-50' : 'bg-red-50') : ''}">
+            <span class="text-sm"><b>${shortThaiDate(d.date)}</b> <span class="text-[11px] text-slate-400">${dayNameOf(d.date)}</span></span>
+            <span class="font-mono text-sm">${f.slice(0, 4)}<b class="${hi}">${f.slice(4)}</b></span>
+            <span class="text-[11px] text-slate-500 font-mono">${tail}</span>
+          </button>`;
+        }).join('')}
+      </div>
+    </section>`;
+}
+
 /* ------------------------------------------------------------------ reference */
 function renderReference() {
   const data = TABLES_DATA[state.refSub];
@@ -622,6 +715,17 @@ document.addEventListener('click', async (e) => {
   const d = t.dataset;
 
   if (d.tab) return switchTab(d.tab);
+  if (d.ckind) {
+    state.checkKind = d.ckind;
+    state.checkIdx = 0;
+    state.checkNum = '';
+    return renderCheck();
+  }
+  if (d.cidx !== undefined) {
+    state.checkIdx = Number(d.cidx);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return renderCheck();
+  }
   if (d.quick) {
     const q = QUICK_DRAWS.find((x) => x.iso === d.quick);
     applyDate(parseISO(q.iso), { phase: q.phase, kham: q.kham });
@@ -710,11 +814,22 @@ document.addEventListener('click', async (e) => {
 
 document.addEventListener('change', (e) => {
   if (e.target.id === 'dateInput' && e.target.value) applyDate(parseISO(e.target.value));
+  if (e.target.id === 'checkDraw') {
+    state.checkIdx = Number(e.target.value);
+    return renderCheck();
+  }
   if (e.target.id === 'khamSelect') {
     state.kham = Number(e.target.value);
     state.manual = true;
     compute();
   }
+});
+
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'checkNum') return;
+  state.checkNum = e.target.value.replace(/\D/g, '').slice(0, 6);
+  if (e.target.value !== state.checkNum) e.target.value = state.checkNum;
+  $('checkResult').innerHTML = checkResultHTML();
 });
 
 document.addEventListener('submit', (e) => {
@@ -736,6 +851,7 @@ async function boot() {
   if (mergeThaiDraws(official) + mergeLaoDraws(official) > 0) {
     if (state.tab === 'backtest') renderBacktest();
     if (state.tab === 'lao') renderLao();
+    if (state.tab === 'check') renderCheck();
   }
   if ('serviceWorker' in navigator && import.meta.env.PROD) navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
